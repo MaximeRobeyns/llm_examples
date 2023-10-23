@@ -1,0 +1,10 @@
+cff-version: 1.1.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Robeyns
+    given-names: Maxime
+    orcid: https://orcid.org/0000-0001-9802-9597
+title: "LLM finetuning examples"
+version: 0.0.1
+date-released: 2023-10-23
+repository-code: "https://github.com/maximerobeyns/transformer_finetuning_examples"
