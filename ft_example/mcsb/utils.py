@@ -11,6 +11,4 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""A project containing various examples for language model finetuning"""
-
-__version__ = "0.0.1"
+"""Utilities for the MCSB task"""

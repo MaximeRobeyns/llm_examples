@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""A project containing various examples for language model finetuning"""
 
-__version__ = "0.0.1"
+from ft_example.llm.vllm import VLLM
+from ft_example.llm.openai import OpenAILLM
+from ft_example.llm.anthropic import AnthropicLLM
+from ft_example.llm.huggingface import HuggingFaceLLM
