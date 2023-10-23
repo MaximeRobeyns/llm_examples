@@ -1,0 +1,39 @@
+_target_: ft_example.llm.huggingface.HuggingFaceLLM
+
+name: GPT2 xl
+
+model_name_or_path: gpt2-xl
+
+config_class: AutoConfig
+config_kwargs: {}
+
+tokenizer_class: AutoTokenizer
+tokenizer_kwargs:
+  use_fast: true
+
+model_class: AutoModelForCausalLM
+model_kwargs:
+  low_cpu_mem_usage: True
+  torch_dtype: bfloat16
+
+# Global HF generation configurations
+global_gen_kwargs: {}
+
+use_peft: true
+peft_config:
+  _target_: peft.AdaLoraConfig
+  lora_alpha: 8
+  # bias: "none"
+  task_type: "CAUSAL_LM"
+  inference_mode: false
+  # _target_: peft.LoraConfig
+  # r: 24
+  # lora_alpha: 32
+  # target_modules: ["c_attn", "c_proj", "c_fc", "c_proj", "lm_head"]
+  # lora_dropout: 0.05
+  # bias: "none"
+  # task_type: "CAUSAL_LM"
+  # inference_mode: false
+
+defaults:
+  - quantization: none

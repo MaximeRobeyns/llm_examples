@@ -1,0 +1,29 @@
+_target_: ft_example.llm.huggingface.HuggingFaceLLM
+
+name: Llama2
+
+model_name_or_path: meta-llama/Llama-2-7b-chat-hf
+
+config_class: AutoConfig
+config_kwargs:
+  trust_remote_code: True
+
+tokenizer_class: AutoTokenizer
+tokenizer_kwargs:
+  use_fast: true
+
+model_class: AutoModelForCausalLM
+model_kwargs: {}
+
+# Global HF generation configurations
+global_gen_kwargs: {}
+
+use_peft: true
+peft_config:
+  _target_: peft.AdaLoraConfig
+  lora_alpha: 8
+  task_type: "CAUSAL_LM"
+  inference_mode: false
+
+defaults:
+  - quantization: none

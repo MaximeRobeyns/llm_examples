@@ -1,0 +1,34 @@
+_target_: ft_example.llm.huggingface.HuggingFaceLLM
+
+name: FlanT5 base
+
+model_name_or_path: google/flan-t5-base
+
+config_class: AutoConfig
+config_kwargs: {}
+
+tokenizer_class: AutoTokenizer
+tokenizer_kwargs:
+  use_fast: true
+
+model_class: AutoModelForSeq2SeqLM
+model_kwargs:
+  low_cpu_mem_usage: True
+  torch_dtype: bfloat16
+
+# Global HF generation configurations
+global_gen_kwargs: {}
+
+use_peft: true
+peft_config:
+  _target_: peft.LoraConfig
+  r: 16
+  lora_alpha: 32
+  target_modules: ["c_attn", "c_proj", "c_fc", "c_proj", "lm_head"]
+  lora_dropout: 0.05
+  bias: "none"
+  task_type: "SEQ_2_SEQ_LM"
+  inference_mode: false
+
+defaults:
+  - quantization: none

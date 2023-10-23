@@ -1,0 +1,20 @@
+# @package _global_
+
+notes: |-
+  Write some notes here to describe the run.
+
+# The logging level; one of CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET
+log_level: INFO
+
+# optional random seed for deterministic runs
+seed: 42
+
+# Whether to print out the configuration at the start of the run
+print_config: True
+
+defaults:
+  - task: mcsb.yaml
+  - hydra: default.yaml
+  - paths: default.yaml
+  - llm: gpt2.yaml
+  - _self_

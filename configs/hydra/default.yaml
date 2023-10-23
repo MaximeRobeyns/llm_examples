@@ -1,0 +1,9 @@
+# The output directory is generated dynamically on each run based on the task
+# name.
+run:
+  dir: ${paths.log_dir}/${task.name}/${now:%Y-%m-%d_%H-%M-%S}
+
+help:
+  app_name: "LLM finetuning examples"
+  header: "\n\nHelp Information"
+  footer: "Use --hydra-help to view Hydra specific help information"
