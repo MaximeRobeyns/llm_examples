@@ -1,4 +1,4 @@
-_target_: ft_example.llm.huggingface.HuggingFaceLLM
+_target_: llm_examples.llm.huggingface.HuggingFaceLLM
 
 name: GPT2 xl
 

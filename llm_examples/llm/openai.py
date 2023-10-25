@@ -16,7 +16,7 @@
 import os
 import openai
 
-from ft_example.llm.base import LLM
+from llm_examples.llm.base import LLM
 
 
 class OpenAILLM(LLM):

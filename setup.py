@@ -20,7 +20,7 @@ CWD = Path(__file__).absolute().parent
 
 def get_version():
     """Gets the project version"""
-    path = CWD / "ft_example" / "__init__.py"
+    path = CWD / "llm_examples" / "__init__.py"
     content = path.read_text()
     for line in content.splitlines():
         if line.startswith("__version__"):
@@ -31,4 +31,4 @@ def get_version():
 if __name__ == "__main__":
     print(f"version: {get_version()}")
     # NOTE: main project info is in pyproject.toml
-    setup(name="ft_example", version=get_version())
+    setup(name="llm_examples", version=get_version())

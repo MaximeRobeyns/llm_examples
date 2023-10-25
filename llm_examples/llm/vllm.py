@@ -15,7 +15,7 @@
 
 import vllm
 
-from ft_example.llm.base import LLM
+from llm_examples.llm.base import LLM
 
 
 class VLLM(LLM):

@@ -19,15 +19,14 @@ import torch as t
 import logging
 import transformers
 
-from abc import abstractmethod
 from peft import LoraConfig, get_peft_model
 from typing import Optional
 from omegaconf import OmegaConf
 from hydra.utils import instantiate
 from transformers import GenerationConfig, BitsAndBytesConfig
 
-from ft_example.llm.base import LLM
-from ft_example.utils import get_fst_device, str_to_torch_dtype
+from llm_examples.llm.base import LLM
+from llm_examples.utils import get_fst_device, str_to_torch_dtype
 
 
 class HuggingFaceLLM(LLM):

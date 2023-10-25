@@ -4,6 +4,6 @@ run:
   dir: ${paths.log_dir}/${task.name}/${now:%Y-%m-%d_%H-%M-%S}
 
 help:
-  app_name: "LLM finetuning examples"
+  app_name: "LLM examples"
   header: "\n\nHelp Information"
   footer: "Use --hydra-help to view Hydra specific help information"

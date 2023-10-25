@@ -2,7 +2,7 @@
 
 finetune:  ## Example model fine-tuning script on symbol binding task
 	accelerate launch --config_file configs/accelerate/local_with_ds.yaml \
-		ft_example/mcsb_finetune.py
+		llm_examples/mcsb_finetune.py
 
 install:  ## Install the project locally
 	pip install -e .

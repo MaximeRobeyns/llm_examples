@@ -1,3 +1,3 @@
-_target_: ft_example.mcsb.mcsb.MCSBTask
+_target_: llm_examples.mcsb.mcsb.MCSBTask
 
 name: mcsb

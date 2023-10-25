@@ -16,7 +16,7 @@
 import os
 import anthropic
 
-from ft_example.llm.base import LLM
+from llm_examples.llm.base import LLM
 
 
 class AnthropicLLM(LLM):

@@ -1,4 +1,4 @@
-from ft_example.tasks import Task
+from llm_examples.tasks import Task
 
 
 class MCSBTask(Task):

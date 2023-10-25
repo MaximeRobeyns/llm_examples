@@ -18,7 +18,7 @@ from omegaconf.omegaconf import DictConfig
 from lightning.fabric.loggers.csv_logs import CSVLogger
 from lightning.fabric.loggers.tensorboard import TensorBoardLogger
 
-from ft_example.llm.base import LLM
+from llm_examples.llm.base import LLM
 
 
 class Task:

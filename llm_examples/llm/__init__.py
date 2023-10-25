@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ft_example.llm.vllm import VLLM
-from ft_example.llm.openai import OpenAILLM
-from ft_example.llm.anthropic import AnthropicLLM
-from ft_example.llm.huggingface import HuggingFaceLLM
+from llm_examples.llm.vllm import VLLM
+from llm_examples.llm.openai import OpenAILLM
+from llm_examples.llm.anthropic import AnthropicLLM
+from llm_examples.llm.huggingface import HuggingFaceLLM
