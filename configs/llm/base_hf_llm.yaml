@@ -1,0 +1,17 @@
+_target_: llm_examples.llm.huggingface.HuggingFaceLLM
+
+config_class: AutoConfig
+config_kwargs: {}
+
+tokenizer_class: AutoTokenizer
+tokenizer_kwargs:
+  use_fast: true
+
+model_class: AutoModelForCausalLM
+model_kwargs:
+  torch_dtype: auto
+
+# Global HF generation configurations
+global_gen_kwargs: {}
+
+use_peft: false

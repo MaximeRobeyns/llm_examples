@@ -1,0 +1,24 @@
+# @package _global_
+
+notes: |-
+  Multiple choice symbol binding finetuning.
+
+task_name: mcsb
+
+epochs: 5
+
+# The following are task-specific modifications / overloads to the llm
+# configuration loaded above:
+llm:
+  use_peft: true
+  model_kwargs:
+    low_cpu_mem_usage: true
+    torch_dtype: auto
+
+defaults:
+  - base_config
+  - opt: adamw
+  - llm: gpt2.yaml
+  - override llm/peft: adalora
+  - override llm/quantization: 8bit
+  - _self_

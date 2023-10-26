@@ -3,6 +3,8 @@
 notes: |-
   Write some notes here to describe the run.
 
+task_name: development
+
 # The logging level; one of CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET
 log_level: INFO
 
@@ -13,8 +15,6 @@ seed: 42
 print_config: True
 
 defaults:
-  - task: mcsb.yaml
   - hydra: default.yaml
   - paths: default.yaml
-  - llm: gpt2.yaml
   - _self_

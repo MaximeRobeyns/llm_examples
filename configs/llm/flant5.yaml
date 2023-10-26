@@ -1,20 +1,11 @@
-_target_: llm_examples.llm.huggingface.HuggingFaceLLM
-
 name: FlanT5 base
 
 model_name_or_path: google/flan-t5-base
 
-config_class: AutoConfig
-config_kwargs: {}
-
-tokenizer_class: AutoTokenizer
 tokenizer_kwargs:
   use_fast: true
 
 model_class: AutoModelForSeq2SeqLM
-model_kwargs:
-  low_cpu_mem_usage: True
-  torch_dtype: bfloat16
 
 # Global HF generation configurations
 global_gen_kwargs: {}

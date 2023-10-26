@@ -22,11 +22,14 @@ import transformers
 from peft import LoraConfig, get_peft_model
 from typing import Optional
 from omegaconf import OmegaConf
-from hydra.utils import instantiate
 from transformers import GenerationConfig, BitsAndBytesConfig
 
 from llm_examples.llm.base import LLM
-from llm_examples.utils import get_fst_device, str_to_torch_dtype
+from llm_examples.utils import (
+    get_fst_device,
+    str_to_torch_dtype,
+    prepare_model_for_quantized_training,
+)
 
 
 class HuggingFaceLLM(LLM):
@@ -42,7 +45,7 @@ class HuggingFaceLLM(LLM):
         model_kwargs: dict = dict(),
         global_gen_kwargs: dict = dict(),
         use_peft: bool = False,
-        peft_config: Optional[LoraConfig] = None,
+        peft: Optional[LoraConfig] = None,
         quantization: Optional[BitsAndBytesConfig] = None,
     ):
         super().__init__(name)
@@ -60,13 +63,13 @@ class HuggingFaceLLM(LLM):
             if "dtype" in k.lower() and v != "auto":
                 model_kwargs[k] = str_to_torch_dtype(v)
         if quantization is not None:
-            model_kwargs["quantization_config"] = instantiate(quantization)
+            model_kwargs["quantization_config"] = quantization
         logging.debug(f"Model kwargs: {model_kwargs}")
         self.model = model_cls.from_pretrained(
             model_name_or_path, config=model_config, **model_kwargs
         )
         if use_peft:
-            self.peft_config = peft_config
+            self.peft_config = peft
             self.model = prepare_model_for_quantized_training(self.model)
             self.model = get_peft_model(self.model, self.peft_config)
 

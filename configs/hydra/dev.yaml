@@ -1,6 +1,6 @@
 run:
-  dir: ${paths.log_dir}/${task.name}/dev_run
+  dir: ${paths.log_dir}/${task_name}/dev_run
 
 defaults:
+  - default.yaml
   - _self_
-  - defaults.yaml
