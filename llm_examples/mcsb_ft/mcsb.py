@@ -19,6 +19,7 @@ import logging
 import importlib
 import transformers
 
+from accelerate import Accelerator
 from wonderwords import RandomWord
 from torch.optim import Optimizer
 from hydra.utils import instantiate
@@ -29,8 +30,8 @@ from lightning.fabric.loggers.tensorboard import TensorBoardLogger
 
 from llm_examples.utils import setup_loggers, setup_accelerator
 from llm_examples.llm.huggingface import HuggingFaceLLM
-from llm_examples.mcsb_ft.utils import get_new_words, clean
-from llm_examples.mcsb_ft.prompts import description_prompt, question_prompt
+from llm_examples.mcsb_ft.utils import get_new_words, clean, get_num_correct
+from llm_examples.mcsb_ft.prompts import description_prompt, question_preamble
 
 
 def run(
@@ -38,22 +39,23 @@ def run(
     model: HuggingFaceLLM,
     opt: Optimizer,
     lr_scheduler: LRScheduler,
+    accelerator: Accelerator,
     tb_logger: TensorBoardLogger,
     csv_logger: CSVLogger,
-    device: t.device,
 ):
-    # Resume from checkpoint if one is available.
-    # Optionally retain only the last n checkpoints
+    # TODO: Resume from checkpoint if one is available.
 
     label_ids = model.tokenizer(
         [f"{chr(ord('A') + i)}" for i in range(5)], return_tensors="pt"
     ).input_ids[:, -1:]
 
     r = RandomWord()
+    device = accelerator.device
+    batch_size = task_cfg.micro_batch_size * task_cfg.gradient_accumulation_steps
 
     # For logging
     correct = 0
-    loss_totla = 0.0
+    loss_total = 0.0
 
     for it in range(task_cfg.num_iters):
 
@@ -73,15 +75,75 @@ def run(
                 temperature=0.5,
                 pad_token_id=model.tokenizer.eos_token_id,
             )
-        outputs = outputs[0]  # only one generation sampled
-        print(outputs)
-        return
-        gen_descriptions = [clean(outputs, model.tokenizer.eos_token)]
-        gen_descriptions = [
-            clean(
-                s,
+        outputs = [o[0] for o in outputs]  # only one generation sampled
+        gen_descriptions = [clean(s, model.tokenizer.eos_token) for s in outputs]
+        gen_descriptions = [clean(s, "\n") for s in gen_descriptions]
+
+        # 2.2 Generate question prompts
+        question_prompts: list[str] = []
+        answer_idxs = t.empty((task_cfg.micro_batch_size,)).int()
+        for i in range(len(word_lists)):
+            random_ord = t.randperm(task_cfg.num_labels)
+            answer_idxs[i] = (random_ord == 0).nonzero()
+            question_prompt = question_preamble
+            question_prompt += f"Description: {gen_descriptions[i]}\n"
+            question_prompt += "\n".join(
+                [
+                    f"{chr(ord('A') + j)}) {word_lists[i][k]}"
+                    for (j, k) in enumerate(random_ord)
+                ]
             )
-        ]
+            question_prompt += "\nAnswer (A to E):"
+            question_prompts.append(question_prompt)
+
+        # 3. Answer the question
+        question_inputs = model.tokenizer(
+            question_prompts, return_tensors="pt", padding=True
+        ).to(device)
+        logits = model.model(**question_inputs).logits
+
+        # Calculate the log-likelihood loss
+        answer_ids = t.tensor([label_ids[a] for a in answer_idxs])
+        answer_dist = t.distributions.Categorical(logits=logits[:, -1])
+        LL = answer_dist.log_prob(answer_ids.to(logits.device))
+        loss = -LL.mean()
+        loss = loss / task_cfg.gradient_accumulation_steps
+
+        accelerator.backward(loss)
+
+        loss_total += loss.item()
+
+        # Calculate the accuracy
+        correct += get_num_correct(logits[:, -1], label_ids, answer_idxs)
+
+        if (it + 1) % task_cfg.gradient_accumulation_steps == 0:
+            opt.step()
+            lr_scheduler.step()
+            opt.zero_grad()
+
+            real_iter = it // task_cfg.gradient_accumulation_steps
+            avg_batch_loss = loss_total / task_cfg.gradient_accumulation_steps
+            accuracy = correct / batch_size
+            logging.info(
+                "Step %d: loss %.4f, accuracy %.4f", real_iter, avg_batch_loss, accuracy
+            )
+            tb_logger.log_metrics(
+                {
+                    "loss": avg_batch_loss,
+                    "accuracy": accuracy,
+                    "lr": lr_scheduler.get_last_lr()[0],
+                },
+                step=real_iter,
+            )
+            tb_logger.experiment.add_text(
+                "question_prompts", "\n\n".join(question_prompts), real_iter
+            )
+
+            correct = 0
+            loss_total = 0.0
+
+        # TODO: checkpoint
+        # Optionally retain only the last n checkpoints
 
 
 @hydra.main(
@@ -116,7 +178,7 @@ def do_mcsb_task(cfg: DictConfig):
     model, opt, lr_scheduler = accelerator.prepare(model, opt, lr_scheduler)
 
     # Run the training
-    run(cfg, model, opt, lr_scheduler, tb_logger, csv_logger, accelerator.device)
+    run(cfg, model, opt, lr_scheduler, accelerator, tb_logger, csv_logger)
 
     # Do post-processing and save final model
 

@@ -62,15 +62,17 @@ class HuggingFaceLLM(LLM):
 
         # Load the HF model
         model_cls = getattr(transformers, model_class)
-        if not isinstance(config_kwargs, dict):
+        # if not isinstance(config_kwargs, dict):
+        try:
             model_kwargs = OmegaConf.to_object(model_kwargs)
+        except Exception:
+            pass
         assert isinstance(model_kwargs, dict)
         for k, v in model_kwargs.items():
             if "dtype" in k.lower() and v != "auto":
                 model_kwargs[k] = str_to_torch_dtype(v)
         if quantization is not None:
             model_kwargs["quantization_config"] = quantization
-        logging.debug(f"Model kwargs: {model_kwargs}")
         self.model = model_cls.from_pretrained(
             model_name_or_path, config=model_config, **model_kwargs
         )
@@ -110,20 +112,18 @@ class HuggingFaceLLM(LLM):
         self, prompt: str | list[str], num_samples: int = 1, **kwargs
     ) -> list[str] | list[list[str]]:
         """A high-level generation function for HuggingFace transformers.
-        If you require more control, use access the underlying `model` and
-        `tokenizer` fields from this model.
+
+        If you need more control, use the underlying `model` and `tokenizer`.
         """
         device = get_fst_device(self.model)
 
         inputs = self.tokenizer(prompt, return_tensors="pt", padding=True).to(device)
         for k in inputs.keys():
             if isinstance(inputs[k], t.Tensor):
-                print(inputs[k].shape)
                 inputs[k] = inputs[k].repeat_interleave(num_samples, 0)
-                print(inputs[k].shape)
-                # inputs[k] = inputs[k].repeat_interleave(num_samples, -1)
         input_len = inputs.input_ids.size(-1)
         gen_cfg = copy(self.gen_cfg)
+        setattr(gen_cfg, "pad_token_id", self.tokenizer.eos_token_id)
         for k, v in kwargs.items():
             setattr(gen_cfg, k, v)
         with t.inference_mode():

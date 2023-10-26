@@ -7,6 +7,8 @@ tokenizer_class: AutoTokenizer
 tokenizer_kwargs:
   use_fast: true
 
+tokenizer_special_tokens: {}
+
 model_class: AutoModelForCausalLM
 model_kwargs:
   torch_dtype: auto

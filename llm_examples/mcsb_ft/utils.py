@@ -13,8 +13,20 @@
 # limitations under the License.
 """Utilities for the MCSB task"""
 
+from torchtyping import TensorType as Tensor
 from wonderwords import RandomWord
 from transformers import PreTrainedTokenizer
+
+
+def get_num_correct(
+    logits: Tensor["batch", "vocab"],
+    label_ids: Tensor["labels", 1],
+    answer_idxs: Tensor["batch"],
+) -> int:
+    answer_logits = logits.gather(1, label_ids.T.expand(logits.size(0), -1))
+    max_logit = answer_logits.argmax(-1).cpu()
+    assert max_logit.shape == answer_idxs.shape
+    return int((max_logit == answer_idxs).sum().item())
 
 
 def clean(seq: str, sep: str) -> str:

@@ -29,13 +29,13 @@ llm:
   use_peft: true
   model_kwargs:
     low_cpu_mem_usage: true
-    torch_dtype: auto
+    torch_dtype: bfloat16
 
   tokenizer_kwargs:
     padding_side: left
 
   tokenizer_special_tokens:
-    padding_token: tokenizer.bos_token
+    pad_token: tokenizer.bos_token
 
   global_gen_kwargs:
     do_sample: True

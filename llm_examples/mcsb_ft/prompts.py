@@ -27,4 +27,6 @@ Description: The act of working together as a team and communicating effectively
 Word: {}
 Description:"""
 
-question_prompt = "Return the label of the word which best matches the description.\n\n"
+question_preamble = (
+    "Return the label of the word which best matches the description.\n\n"
+)
