@@ -21,6 +21,10 @@ import shutil
 import logging
 import importlib
 
+from typing import Optional
+from accelerate import Accelerator
+from accelerate.utils import set_seed
+from accelerate.state import AcceleratorState
 from transformers import PreTrainedModel
 from omegaconf.omegaconf import OmegaConf, DictConfig
 from lightning.fabric.loggers.csv_logs import CSVLogger
@@ -41,7 +45,10 @@ def get_fst_device(model: nn.Module) -> t.device:
     return next(model.parameters()).device
 
 
-def setup_run(cfg: DictConfig):
+def setup_loggers(cfg: DictConfig):
+    """
+    Sets up loggers for the run based on the provided configurations.
+    """
 
     logging.getLogger().setLevel(getattr(logging, cfg.log_level.upper(), "INFO"))
 
@@ -64,6 +71,31 @@ def setup_run(cfg: DictConfig):
         "/".join(op[:-2]), op[-2], op[-1], flush_logs_every_n_steps=1
     )
     return tb_logger, csv_logger
+
+
+def setup_accelerator(
+    micro_batch_size: int, seed: Optional[int] = None, **accel_kwargs
+) -> Accelerator:
+    """
+    Configures the huggingface accelerator.
+
+    The (micro) batch size must be divisible by the number of processes.
+    """
+    accelerator = Accelerator(**accel_kwargs)
+    logging.info(f"Accelerator created with device: {accelerator.device}")
+    if AcceleratorState().deepspeed_plugin is not None:
+        assert micro_batch_size % accelerator.num_processes == 0, (
+            f"Micro batch size ({micro_batch_size}) is not divisible"
+            f"by the number of processes {accelerator.num_processes}"
+        )
+        AcceleratorState().deepspeed_plugin.deepspeed_config[
+            "train_micro_batch_size_per_gpu"
+        ] = int(micro_batch_size / accelerator.num_processes)
+
+    if seed is not None:
+        set_seed(seed)
+
+    return accelerator
 
 
 def prepare_model_for_quantized_training(

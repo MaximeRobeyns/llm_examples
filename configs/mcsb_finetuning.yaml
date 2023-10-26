@@ -1,11 +1,27 @@
 # @package _global_
 
+defaults:
+  - base_config
+  - opt: adamw
+  - llm: gpt2.yaml
+  - override llm/peft: adalora
+  - override llm/quantization: 8bit
+  - _self_
+
 notes: |-
   Multiple choice symbol binding finetuning.
 
-task_name: mcsb
+# The number of multiple-choice options in each question
+num_labels: 5
 
-epochs: 5
+task_name: mcsb
+num_iters: 1000
+num_warmup_steps: 10
+
+# batch size = micro_batch_size * gradient_accumulation_steps
+# note: micro_batch_size must be divisible by number of processes
+micro_batch_size: 10
+gradient_accumulation_steps: 1
 
 # The following are task-specific modifications / overloads to the llm
 # configuration loaded above:
@@ -15,10 +31,11 @@ llm:
     low_cpu_mem_usage: true
     torch_dtype: auto
 
-defaults:
-  - base_config
-  - opt: adamw
-  - llm: gpt2.yaml
-  - override llm/peft: adalora
-  - override llm/quantization: 8bit
-  - _self_
+  tokenizer_kwargs:
+    padding_side: left
+
+  tokenizer_special_tokens:
+    padding_token: tokenizer.bos_token
+
+  global_gen_kwargs:
+    do_sample: True

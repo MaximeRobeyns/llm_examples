@@ -12,3 +12,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utilities for the MCSB task"""
+
+from wonderwords import RandomWord
+from transformers import PreTrainedTokenizer
+
+
+def clean(seq: str, sep: str) -> str:
+    """Returns the substring before the separator, if it exists"""
+    return seq.split(sep)[0].strip() if sep in seq else seq
+
+
+def get_new_words(
+    tokenizer: PreTrainedTokenizer, r: RandomWord, n: int
+) -> tuple[list[str], list[int]]:
+    """
+    Will return `n` random nouns which encode to a single token under the
+    provided tokenizer.
+
+    Args:
+        tokenizer: The HF tokenizer to use.
+        r: The RandomWord instance to use.
+        n: The number of words to return.
+    """
+    words: list[str] = []
+    word_ids: list[int] = []
+
+    for _ in range(n):
+        while True:
+            word = r.word(include_parts_of_speech=["nouns"])
+            ids = tokenizer(word, add_special_tokens=False).input_ids
+            if len(ids) == 1:
+                words.append(word)
+                word_ids.append(ids[0])  # this is just a singleton list
+                break
+    return words, word_ids

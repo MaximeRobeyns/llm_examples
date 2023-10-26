@@ -13,7 +13,7 @@
 # limitations under the License.
 """Prompts for the MCSB task"""
 
-question_prompt = """Write a description for each of the following wods:
+description_prompt = """Write a description for each of the following wods:
 
 Word: satisfaction
 Description: This is a pleasant feeling often associated with a sense of accomplishment.
@@ -27,4 +27,4 @@ Description: The act of working together as a team and communicating effectively
 Word: {}
 Description:"""
 
-mcqa_preamble = "Return the label of the word which best matches the description.\n\n"
+question_prompt = "Return the label of the word which best matches the description.\n\n"

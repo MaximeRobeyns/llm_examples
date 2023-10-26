@@ -33,6 +33,7 @@ dependencies = [
     "datasets",
     "deepspeed",
     "tensorboard",
+    "wonderwords",
     "torchtyping",
     "transformers",
     "sentencepiece",  # required for Llama tokenizer
