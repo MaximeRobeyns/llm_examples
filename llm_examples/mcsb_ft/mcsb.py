@@ -13,7 +13,9 @@
 # limitations under the License.
 """Multiple-choice symbol binding task"""
 
+import os
 import hydra
+import shutil
 import torch as t
 import logging
 import importlib
@@ -43,7 +45,15 @@ def run(
     tb_logger: TensorBoardLogger,
     csv_logger: CSVLogger,
 ):
-    # TODO: Resume from checkpoint if one is available.
+    # Resume from checkpoint if one is available.
+    check_dir = f"{task_cfg.paths.output_dir}/checkpoints"
+    if os.path.exists(check_dir):
+        ckpt = [c for c in os.listdir(check_dir) if c.startswith("ckpt")][-1]
+        start_it = int(ckpt.split("-")[-1])
+        logging.info(f"Resuming from {ckpt}")
+        accelerator.load_state(f"{check_dir}/{ckpt}")
+    else:
+        start_it = 0
 
     r = RandomWord()
     device = accelerator.device
@@ -57,7 +67,7 @@ def run(
     correct = 0
     loss_total = 0.0
 
-    for it in range(task_cfg.num_iters):
+    for it in range(start_it, task_cfg.num_iters):
 
         # 1. Select a batch of n random words
         word_lists = [
@@ -116,12 +126,14 @@ def run(
         # Calculate the accuracy
         correct += get_num_correct(logits[:, -1], label_ids, answer_idxs)
 
+        real_iter = it // task_cfg.gradient_accumulation_steps
+
+        # Logging
         if (it + 1) % task_cfg.gradient_accumulation_steps == 0:
             opt.step()
             lr_scheduler.step()
             opt.zero_grad()
 
-            real_iter = it // task_cfg.gradient_accumulation_steps
             avg_batch_loss = loss_total / task_cfg.gradient_accumulation_steps
             accuracy = correct / batch_size
             logging.info(
@@ -142,8 +154,14 @@ def run(
             correct = 0
             loss_total = 0.0
 
-        # TODO: checkpoint
-        # Optionally retain only the last n checkpoints
+        # Save checkpoints
+        if (real_iter + 1) % task_cfg.checkpoint.freq == 0:
+            check_name = f"ckpt-{real_iter+1}"
+            accelerator.save_state(f"{check_dir}/{check_name}")
+            ckpts = [c for c in os.listdir(check_dir) if c.startswith("ckpt")]
+            if task_cfg.checkpoint.keep is not None and accelerator.is_main_process:
+                if len(ckpts) > task_cfg.checkpoint.keep:
+                    shutil.rmtree(f"{check_dir}/{ckpts[0]}")
 
 
 @hydra.main(
@@ -153,7 +171,7 @@ def do_mcsb_task(cfg: DictConfig):
     # Set up logging
     tb_logger, csv_logger = setup_loggers(cfg)
 
-    # Set up LLM
+    # Set up LLM to train
     model: HuggingFaceLLM = instantiate(cfg.llm)
 
     # Setup optimiser
@@ -177,13 +195,16 @@ def do_mcsb_task(cfg: DictConfig):
     )
 
     model.model, opt, lr_scheduler = accelerator.prepare(model.model, opt, lr_scheduler)
-    # print(model.generate("The cat sat"))
 
     # Run the training
     run(cfg, model, opt, lr_scheduler, accelerator, tb_logger, csv_logger)
 
-    # Do post-processing and save final model
-    # TODO: merge adapters, AWQ
+    # Perform any post-processing and save final model
+    logging.info("Doing post-processing")
+
+    unwrapped_model = accelerator.unwrap_model(model.model)
+    unwrapped_model = unwrapped_model.merge_and_unload()
+    unwrapped_model.save_pretrained(f"{cfg.paths.output_dir}/{cfg.task_name}_model")
 
     logging.info("successfully completed.")
     csv_logger.finalize("success")

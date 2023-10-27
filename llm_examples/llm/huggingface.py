@@ -19,7 +19,7 @@ import torch as t
 import logging
 import transformers
 
-from peft import LoraConfig, get_peft_model
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from copy import copy
 from typing import Optional
 from omegaconf import OmegaConf
@@ -50,6 +50,7 @@ class HuggingFaceLLM(LLM):
         peft: Optional[LoraConfig] = None,
         quantization: Optional[BitsAndBytesConfig] = None,
     ):
+
         if name is None:
             name = model_name_or_path
         super().__init__(name)
@@ -75,11 +76,13 @@ class HuggingFaceLLM(LLM):
         self.model = model_cls.from_pretrained(
             model_name_or_path, config=model_config, **model_kwargs
         )
+        if quantization is not None:
+            self.model = prepare_model_for_kbit_training(self.model)
 
         # Configure PEFT if required
         if use_peft:
+            logging.info("Using PEFT")
             self.peft_config = peft
-            self.model = prepare_model_for_quantized_training(self.model)
             self.model = get_peft_model(self.model, self.peft_config)
 
         # Load HF tokenizer

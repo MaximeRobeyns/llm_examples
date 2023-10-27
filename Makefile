@@ -2,7 +2,7 @@
 
 finetune:  ## Example model fine-tuning script on symbol binding task
 	accelerate launch --config_file configs/accelerate/local_with_ds.yaml \
-		llm_examples/mcsb_ft/mcsb.py hydra=dev
+		llm_examples/mcsb_ft/mcsb.py # hydra=dev
 
 install:  ## Install the project locally
 	pip install -e .

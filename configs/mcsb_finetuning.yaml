@@ -1,5 +1,6 @@
 # @package _global_
 
+# 1. Load up the default component configurations
 defaults:
   - base_config
   - opt: adamw
@@ -8,26 +9,37 @@ defaults:
   - override llm/quantization: none
   - _self_
 
+# 2. Task-specific configurations:
 notes: |-
   Multiple choice symbol binding finetuning.
+
+task_name: mcsb
+
+seed: 42
 
 # The number of multiple-choice options in each question
 num_labels: 5
 
-task_name: mcsb
 num_iters: 1000
-num_warmup_steps: 10
+num_warmup_steps: 20
 
 # batch size = micro_batch_size * gradient_accumulation_steps
 # note: micro_batch_size must be divisible by number of processes
 micro_batch_size: 20
 gradient_accumulation_steps: 4
 
-opt:
-  lr: 0.0001
+checkpoint:
+  freq: 500
+  keep: 3
+# to recover from a given checkpoint, paste the directory path here:
+# hydra:
+#   run:
+#     dir: logs/mcsb/2023-10-27_11-38-56
 
-# The following are task-specific modifications / overloads to the llm
-# configuration loaded above:
+opt:
+  lr: 0.0005
+
+# 3. Overload default component configurations for the task at hand
 llm:
   use_peft: true
 

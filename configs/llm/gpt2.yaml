@@ -1,9 +1,9 @@
 name: GPT2 xl
 model_name_or_path: gpt2
 
-# peft:
-# List of all available modules to target for gpt2
-# target_modules: ["c_attn", "c_proj", "c_fc", "c_proj", "lm_head"]
+peft:
+  # List of all available modules to target for gpt2
+  target_modules: ["c_attn", "c_proj", "c_fc", "c_proj", "lm_head"]
 
 defaults:
   - base_hf_llm

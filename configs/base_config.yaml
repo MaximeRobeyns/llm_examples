@@ -3,16 +3,21 @@
 notes: |-
   Write some notes here to describe the run.
 
+# tip: will be used for paths (avoid spces and special characters)
 task_name: development
 
 # The logging level; one of CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET
 log_level: INFO
 
 # optional random seed for deterministic runs
-seed: 42
+seed: null
 
 # Whether to print out the configuration at the start of the run
 print_config: True
+
+# Checkpointing
+keep_last: null
+checkpoint_freq: 100
 
 defaults:
   - hydra: default.yaml
