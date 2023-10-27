@@ -45,13 +45,13 @@ def run(
 ):
     # TODO: Resume from checkpoint if one is available.
 
-    label_ids = model.tokenizer(
-        [f"{chr(ord('A') + i)}" for i in range(5)], return_tensors="pt"
-    ).input_ids[:, -1:]
-
     r = RandomWord()
     device = accelerator.device
     batch_size = task_cfg.micro_batch_size * task_cfg.gradient_accumulation_steps
+
+    label_ids = model.tokenizer(
+        [f"{chr(ord('A') + i)}" for i in range(5)], return_tensors="pt"
+    ).input_ids[:, -1:]
 
     # For logging
     correct = 0
@@ -175,12 +175,15 @@ def do_mcsb_task(cfg: DictConfig):
     accelerator = setup_accelerator(
         cfg.micro_batch_size, cfg.seed, project_dir=cfg.paths.output_dir
     )
-    model, opt, lr_scheduler = accelerator.prepare(model, opt, lr_scheduler)
+
+    model.model, opt, lr_scheduler = accelerator.prepare(model.model, opt, lr_scheduler)
+    # print(model.generate("The cat sat"))
 
     # Run the training
     run(cfg, model, opt, lr_scheduler, accelerator, tb_logger, csv_logger)
 
     # Do post-processing and save final model
+    # TODO: merge adapters, AWQ
 
     logging.info("successfully completed.")
     csv_logger.finalize("success")

@@ -74,16 +74,22 @@ def setup_loggers(cfg: DictConfig):
 
 
 def setup_accelerator(
-    micro_batch_size: int, seed: Optional[int] = None, **accel_kwargs
+    micro_batch_size: Optional[int] = None, seed: Optional[int] = None, **accel_kwargs
 ) -> Accelerator:
     """
     Configures the huggingface accelerator.
 
+    If using `accelerate` with synthetic data (i.e. no DataLoader), we need to
+    explicitly tell it the batch size. You can do this by passing the
+    `micro_batch_size` example.
+
     The (micro) batch size must be divisible by the number of processes.
     """
     accelerator = Accelerator(**accel_kwargs)
-    logging.info(f"Accelerator created with device: {accelerator.device}")
-    if AcceleratorState().deepspeed_plugin is not None:
+    logging.info(f"Accelerator created with device {accelerator.device}")
+
+    # If we're using DeepSpeed
+    if AcceleratorState().deepspeed_plugin is not None and micro_batch_size is not None:
         assert micro_batch_size % accelerator.num_processes == 0, (
             f"Micro batch size ({micro_batch_size}) is not divisible"
             f"by the number of processes {accelerator.num_processes}"

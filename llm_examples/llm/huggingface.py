@@ -62,7 +62,6 @@ class HuggingFaceLLM(LLM):
 
         # Load the HF model
         model_cls = getattr(transformers, model_class)
-        # if not isinstance(config_kwargs, dict):
         try:
             model_kwargs = OmegaConf.to_object(model_kwargs)
         except Exception:
@@ -130,18 +129,19 @@ class HuggingFaceLLM(LLM):
             outputs = self.model.generate(**inputs, generation_config=gen_cfg)
         gen_tokens = outputs[:, input_len:]
         outputs = self.tokenizer.batch_decode(gen_tokens, skip_special_tokens=True)
-        if inputs.input_ids.size(0) > 1:
-            return [
-                outputs[i : i + num_samples]
-                for i in range(0, len(outputs), num_samples)
-            ]
-        else:
+        if inputs.input_ids.size(0) == 1:
             return outputs
+        return [
+            outputs[i : i + num_samples] for i in range(0, len(outputs), num_samples)
+        ]
 
     def generate_seq_2_seq(
         self, enc_prompt: str, dec_prompt: str, **kwargs
     ) -> list[str]:
         """Generate for sequence 2 sequence models"""
+
+        # TODO: update to reflect changes in `generate` above
+
         # Assumes both encoder and decoder are on the same device
         device = get_fst_device(self.model)
         enc_ids = self.tokenizer(enc_prompt, return_tensors="pt").to(device)

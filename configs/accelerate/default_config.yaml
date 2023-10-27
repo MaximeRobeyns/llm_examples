@@ -1,4 +1,5 @@
 compute_environment: LOCAL_MACHINE
+debug: false
 deepspeed_config:
   gradient_accumulation_steps: 1
   gradient_clipping: 1.0

@@ -5,7 +5,7 @@ defaults:
   - opt: adamw
   - llm: gpt2.yaml
   - override llm/peft: adalora
-  - override llm/quantization: 8bit
+  - override llm/quantization: none
   - _self_
 
 notes: |-
@@ -20,13 +20,17 @@ num_warmup_steps: 10
 
 # batch size = micro_batch_size * gradient_accumulation_steps
 # note: micro_batch_size must be divisible by number of processes
-micro_batch_size: 10
-gradient_accumulation_steps: 1
+micro_batch_size: 20
+gradient_accumulation_steps: 4
+
+opt:
+  lr: 0.0001
 
 # The following are task-specific modifications / overloads to the llm
 # configuration loaded above:
 llm:
   use_peft: true
+
   model_kwargs:
     low_cpu_mem_usage: true
     torch_dtype: bfloat16

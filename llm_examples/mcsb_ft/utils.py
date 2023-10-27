@@ -23,7 +23,8 @@ def get_num_correct(
     label_ids: Tensor["labels", 1],
     answer_idxs: Tensor["batch"],
 ) -> int:
-    answer_logits = logits.gather(1, label_ids.T.expand(logits.size(0), -1))
+    gather_idxs = label_ids.T.expand(logits.size(0), -1).to(logits.device)
+    answer_logits = logits.gather(1, gather_idxs)
     max_logit = answer_logits.argmax(-1).cpu()
     assert max_logit.shape == answer_idxs.shape
     return int((max_logit == answer_idxs).sum().item())
