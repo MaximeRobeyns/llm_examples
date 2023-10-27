@@ -15,29 +15,36 @@ notes: |-
 
 task_name: mcsb
 
-seed: 42
+seed: null
 
 # The number of multiple-choice options in each question
 num_labels: 5
 
-num_iters: 1000
-num_warmup_steps: 20
+# the total number of synthetic examples that will be generated and put to the model
+training_examples: 100000
 
 # batch size = micro_batch_size * gradient_accumulation_steps
 # note: micro_batch_size must be divisible by number of processes
 micro_batch_size: 20
 gradient_accumulation_steps: 4
+num_warmup_steps: 20
+
+eval:
+  freq: 10
+  batch_size: 64
+  min_labels: 5
+  max_labels: 9
 
 checkpoint:
-  freq: 500
+  freq: 100
   keep: 3
 # to recover from a given checkpoint, paste the directory path here:
-# hydra:
-#   run:
-#     dir: logs/mcsb/2023-10-27_11-38-56
+hydra:
+  run:
+    dir: logs/mcsb/2023-10-27_15-49-09
 
 opt:
-  lr: 0.0005
+  lr: 0.001
 
 # 3. Overload default component configurations for the task at hand
 llm:

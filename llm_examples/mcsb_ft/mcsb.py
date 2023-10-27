@@ -21,19 +21,125 @@ import logging
 import importlib
 import transformers
 
+from random import randint
+from typing import Optional
 from accelerate import Accelerator
 from wonderwords import RandomWord
 from torch.optim import Optimizer
 from hydra.utils import instantiate
+from transformers import PreTrainedTokenizer
 from omegaconf.omegaconf import DictConfig
 from torch.optim.lr_scheduler import LRScheduler
 from lightning.fabric.loggers.csv_logs import CSVLogger
 from lightning.fabric.loggers.tensorboard import TensorBoardLogger
 
 from llm_examples.utils import setup_loggers, setup_accelerator
-from llm_examples.llm.huggingface import HuggingFaceLLM
+from llm_examples.llm import HuggingFaceLLM, LLM
 from llm_examples.mcsb_ft.utils import get_new_words, clean, get_num_correct
 from llm_examples.mcsb_ft.prompts import description_prompt, question_preamble
+
+
+def get_label_ids(tokenizer: PreTrainedTokenizer, n: int) -> t.Tensor:
+    """Returns the tokenized labels for a question with n choices"""
+    return tokenizer(
+        [f"{chr(ord('A') + i)}" for i in range(n)], return_tensors="pt"
+    ).input_ids[:, -1:]
+
+
+def generate_batch(
+    generation_model: LLM,
+    batch_size: int,
+    min_labels: int,
+    max_labels: Optional[int] = None,
+) -> tuple[list[str], list[t.Tensor], t.Tensor]:
+    """Syntheticallly generate a batch of data.
+
+    Args:
+        generation_model: The model to use for generation (can be different
+            from the one we're trainiing; 3rd party API, etc.)
+        batch_size: number of entries to genreate
+        min_labels: (min) number of labels each batch question should have
+        max_labels: (optional) if provided each batch element has a random
+            number of labels between min and max-labels.
+
+    Returns:
+        Batch of: 1) questions, 2) tokenized answer labels, 3) correct answer indexes
+    """
+    r = RandomWord()
+    tok = generation_model.tokenizer
+
+    if max_labels is None:
+        max_labels = min_labels
+
+    # 1. Select a batch of n random words
+    word_lists, label_ids = [], []
+    for _ in range(batch_size):
+        n = randint(min_labels, min_labels if max_labels is None else max_labels)
+        word_lists.append(get_new_words(tok, r, n))
+        label_ids.append(get_label_ids(tok, n))
+
+    # 2. Generate synthetic data
+    # 2.1 Generate descriptions
+    description_prompts = [description_prompt.format(wl[0]) for wl in word_lists]
+    with generation_model.disable_adapter(), t.no_grad():
+        outputs = generation_model.generate(
+            description_prompts,
+            max_new_tokens=20,
+            temperature=0.5,
+            pad_token_id=generation_model.tokenizer.eos_token_id,
+        )
+    outputs = [o[0] for o in outputs]  # only one generation sampled
+    gen_descriptions = [clean(s, generation_model.tokenizer.eos_token) for s in outputs]
+    gen_descriptions = [clean(s, "\n") for s in gen_descriptions]
+
+    # 2.2 Generate question prompts
+    question_prompts: list[str] = []
+    answer_idxs = t.empty((batch_size,)).int()
+    for i in range(len(word_lists)):
+        n = len(word_lists[i])
+        random_ord = t.randperm(n)
+        answer_idxs[i] = (random_ord == 0).nonzero()
+        question_prompt = question_preamble
+        question_prompt += f"Description: {gen_descriptions[i]}\n"
+        question_prompt += "\n".join(
+            [
+                f"{chr(ord('A') + j)}) {word_lists[i][k]}"
+                for (j, k) in enumerate(random_ord)
+            ]
+        )
+        question_prompt += "\nAnswer (A to {chr(ord('A') + n-1)}):"
+        question_prompts.append(question_prompt)
+
+    return question_prompts, label_ids, answer_idxs
+
+
+def evaluate_accuracy(
+    model: LLM,
+    device: t.device,
+    batch_size: int = 32,
+    min_labels: int = 3,
+    max_labels: int = 8,
+) -> float:
+    """Evaluates the model by generating MCSB questions with random numbers of
+    labels.
+    """
+    question_prompts, label_ids, answer_idxs = generate_batch(
+        model, batch_size, min_labels, max_labels
+    )
+
+    question_inputs = model.tokenizer(
+        question_prompts, return_tensors="pt", padding=True
+    ).to(device)
+    with t.inference_mode():
+        logits = model.model(**question_inputs).logits
+
+    # Calculate the log-likelihood loss
+    correct = 0
+    for i in range(batch_size):
+        answer_logits = logits[i, -1][label_ids[i].squeeze()]
+        correct += answer_logits.argmax() == answer_idxs[i]
+
+    return correct / batch_size
 
 
 def run(
@@ -49,62 +155,27 @@ def run(
     check_dir = f"{task_cfg.paths.output_dir}/checkpoints"
     if os.path.exists(check_dir):
         ckpt = [c for c in os.listdir(check_dir) if c.startswith("ckpt")][-1]
-        start_it = int(ckpt.split("-")[-1])
+        start_mb = int(ckpt.split("-")[-1])
         logging.info(f"Resuming from {ckpt}")
         accelerator.load_state(f"{check_dir}/{ckpt}")
     else:
-        start_it = 0
+        start_mb = 0
 
-    r = RandomWord()
     device = accelerator.device
     batch_size = task_cfg.micro_batch_size * task_cfg.gradient_accumulation_steps
-
-    label_ids = model.tokenizer(
-        [f"{chr(ord('A') + i)}" for i in range(5)], return_tensors="pt"
-    ).input_ids[:, -1:]
+    num_micro_batches = int(task_cfg.training_examples / task_cfg.micro_batch_size)
+    num_batches = int(task_cfg.training_examples / batch_size)
 
     # For logging
     correct = 0
     loss_total = 0.0
 
-    for it in range(start_it, task_cfg.num_iters):
+    for mb in range(start_mb, num_micro_batches):
 
-        # 1. Select a batch of n random words
-        word_lists = [
-            get_new_words(model.tokenizer, r, task_cfg.num_labels)[0]
-            for _ in range(task_cfg.micro_batch_size)
-        ]
-
-        # 2. Generate synthetic data
-        # 2.1 Generate descriptions
-        description_prompts = [description_prompt.format(wl[0]) for wl in word_lists]
-        with model.disable_adapter(), t.no_grad():
-            outputs = model.generate(
-                description_prompts,
-                max_new_tokens=20,
-                temperature=0.5,
-                pad_token_id=model.tokenizer.eos_token_id,
-            )
-        outputs = [o[0] for o in outputs]  # only one generation sampled
-        gen_descriptions = [clean(s, model.tokenizer.eos_token) for s in outputs]
-        gen_descriptions = [clean(s, "\n") for s in gen_descriptions]
-
-        # 2.2 Generate question prompts
-        question_prompts: list[str] = []
-        answer_idxs = t.empty((task_cfg.micro_batch_size,)).int()
-        for i in range(len(word_lists)):
-            random_ord = t.randperm(task_cfg.num_labels)
-            answer_idxs[i] = (random_ord == 0).nonzero()
-            question_prompt = question_preamble
-            question_prompt += f"Description: {gen_descriptions[i]}\n"
-            question_prompt += "\n".join(
-                [
-                    f"{chr(ord('A') + j)}) {word_lists[i][k]}"
-                    for (j, k) in enumerate(random_ord)
-                ]
-            )
-            question_prompt += "\nAnswer (A to E):"
-            question_prompts.append(question_prompt)
+        # 1. Select a batch of n random words & 2. Generate synthetic data
+        question_prompts, label_ids, answer_idxs = generate_batch(
+            model, task_cfg.micro_batch_size, task_cfg.num_labels
+        )
 
         # 3. Answer the question
         question_inputs = model.tokenizer(
@@ -113,7 +184,7 @@ def run(
         logits = model.model(**question_inputs).logits
 
         # Calculate the log-likelihood loss
-        answer_ids = t.tensor([label_ids[a] for a in answer_idxs])
+        answer_ids = t.tensor([label_ids[0][a] for a in answer_idxs])
         answer_dist = t.distributions.Categorical(logits=logits[:, -1])
         LL = answer_dist.log_prob(answer_ids.to(logits.device))
         loss = -LL.mean()
@@ -124,20 +195,20 @@ def run(
         loss_total += loss.item()
 
         # Calculate the accuracy
-        correct += get_num_correct(logits[:, -1], label_ids, answer_idxs)
-
-        real_iter = it // task_cfg.gradient_accumulation_steps
+        correct += get_num_correct(logits[:, -1], label_ids[0], answer_idxs)
 
         # Logging
-        if (it + 1) % task_cfg.gradient_accumulation_steps == 0:
+        if (mb + 1) % task_cfg.gradient_accumulation_steps == 0:
+            batch = mb // task_cfg.gradient_accumulation_steps
             opt.step()
             lr_scheduler.step()
             opt.zero_grad()
 
             avg_batch_loss = loss_total / task_cfg.gradient_accumulation_steps
             accuracy = correct / batch_size
+            progress = batch / num_batches * 100
             logging.info(
-                "Step %d: loss %.4f, accuracy %.4f", real_iter, avg_batch_loss, accuracy
+                f"Step {batch} ({progress:.2f}%): loss {avg_batch_loss:.4f}, accuracy {accuracy:.4f}"
             )
             tb_logger.log_metrics(
                 {
@@ -145,23 +216,34 @@ def run(
                     "accuracy": accuracy,
                     "lr": lr_scheduler.get_last_lr()[0],
                 },
-                step=real_iter,
+                step=batch,
             )
             tb_logger.experiment.add_text(
-                "question_prompts", "\n\n".join(question_prompts), real_iter
+                "question_prompts", "\n\n".join(question_prompts), batch
             )
 
             correct = 0
             loss_total = 0.0
 
-        # Save checkpoints
-        if (real_iter + 1) % task_cfg.checkpoint.freq == 0:
-            check_name = f"ckpt-{real_iter+1}"
-            accelerator.save_state(f"{check_dir}/{check_name}")
-            ckpts = [c for c in os.listdir(check_dir) if c.startswith("ckpt")]
-            if task_cfg.checkpoint.keep is not None and accelerator.is_main_process:
-                if len(ckpts) > task_cfg.checkpoint.keep:
-                    shutil.rmtree(f"{check_dir}/{ckpts[0]}")
+            # Save checkpoints
+            if (batch + 1) % task_cfg.checkpoint.freq == 0:
+                check_name = f"ckpt-{batch+1}"
+                accelerator.save_state(f"{check_dir}/{check_name}")
+                ckpts = [c for c in os.listdir(check_dir) if c.startswith("ckpt")]
+                if task_cfg.checkpoint.keep is not None and accelerator.is_main_process:
+                    if len(ckpts) > task_cfg.checkpoint.keep:
+                        shutil.rmtree(f"{check_dir}/{ckpts[0]}")
+
+            if (batch + 1) % task_cfg.eval.freq == 0:
+                eval_acc = evaluate_accuracy(
+                    model,
+                    device,
+                    task_cfg.eval.batch_size,
+                    task_cfg.eval.min_labels,
+                    task_cfg.eval.max_labels,
+                )
+                logging.info("Step %d: validation accuracy %.4f", batch, eval_acc)
+                tb_logger.log_metrics({"eval_accuracy": eval_acc}, step=batch)
 
 
 @hydra.main(
@@ -182,11 +264,13 @@ def do_mcsb_task(cfg: DictConfig):
     opt = optclass(model.parameters(), **opt_cfg)
 
     # Setup learning rate scheduler
-    total_train_steps = cfg.num_iters // cfg.gradient_accumulation_steps
+    total_steps = cfg.training_examples / (
+        cfg.micro_batch_size * cfg.gradient_accumulation_steps
+    )
     lr_scheduler = transformers.get_linear_schedule_with_warmup(
         optimizer=opt,
         num_warmup_steps=cfg.num_warmup_steps,
-        num_training_steps=total_train_steps,
+        num_training_steps=total_steps,
     )
 
     # Prepare HF accelerator

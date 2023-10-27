@@ -35,9 +35,7 @@ def clean(seq: str, sep: str) -> str:
     return seq.split(sep)[0].strip() if sep in seq else seq
 
 
-def get_new_words(
-    tokenizer: PreTrainedTokenizer, r: RandomWord, n: int
-) -> tuple[list[str], list[int]]:
+def get_new_words(tokenizer: PreTrainedTokenizer, r: RandomWord, n: int) -> list[str]:
     """
     Will return `n` random nouns which encode to a single token under the
     provided tokenizer.
@@ -48,14 +46,11 @@ def get_new_words(
         n: The number of words to return.
     """
     words: list[str] = []
-    word_ids: list[int] = []
-
     for _ in range(n):
         while True:
             word = r.word(include_parts_of_speech=["nouns"])
             ids = tokenizer(word, add_special_tokens=False).input_ids
             if len(ids) == 1:
                 words.append(word)
-                word_ids.append(ids[0])  # this is just a singleton list
                 break
-    return words, word_ids
+    return words

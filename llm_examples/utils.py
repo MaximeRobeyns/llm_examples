@@ -111,6 +111,8 @@ def prepare_model_for_quantized_training(
     Modification of peft.prepare_model_for_int8_training to also support int4
     quantization from bitsandbytes.
 
+    NOTE: deprecated; see peft.prepare_model_for_kbit_training.
+
     Args:
         model, (`transformers.PreTrainedModel`):
             The loaded model from `transformers`
