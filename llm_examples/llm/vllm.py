@@ -15,12 +15,14 @@
 
 import vllm
 
+from typing import Optional
+
 from llm_examples.llm.base import LLM
 
 
 class VLLM(LLM):
-    def __init__(self, name: str, model_name_or_path: str, **kwargs):
-        super().__init__(name)
+    def __init__(self, model_name_or_path: str, name: Optional[str] = None, **kwargs):
+        super().__init__(name if name is not None else model_name_or_path)
         self.model = vllm.LLM(model_name_or_path, **kwargs)
 
     @property

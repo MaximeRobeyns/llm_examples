@@ -23,6 +23,7 @@ import transformers
 
 from random import randint
 from typing import Optional
+from datasets import Dataset
 from accelerate import Accelerator
 from wonderwords import RandomWord
 from torch.optim import Optimizer
@@ -35,7 +36,12 @@ from lightning.fabric.loggers.tensorboard import TensorBoardLogger
 
 from llm_examples.utils import setup_loggers, setup_accelerator
 from llm_examples.llm import HuggingFaceLLM, LLM
-from llm_examples.mcsb_ft.utils import get_new_words, clean, get_num_correct
+from llm_examples.mcsb_ft.utils import (
+    get_new_words,
+    clean,
+    get_num_correct,
+    prepare_wikitext_dset,
+)
 from llm_examples.mcsb_ft.prompts import description_prompt, question_preamble
 
 
@@ -62,6 +68,9 @@ def generate_batch(
         max_labels: (optional) if provided each batch element has a random
             number of labels between min and max-labels.
 
+    TODO: add the option to use random characters / numbers of labels for an
+        out-of-distribution validation task.
+
     Returns:
         Batch of: 1) questions, 2) tokenized answer labels, 3) correct answer indexes
     """
@@ -81,7 +90,9 @@ def generate_batch(
     # 2. Generate synthetic data
     # 2.1 Generate descriptions
     description_prompts = [description_prompt.format(wl[0]) for wl in word_lists]
-    with generation_model.disable_adapter(), t.no_grad():
+    with generation_model.disable_adapter(), t.no_grad(), t.backends.cuda.sdp_kernel(
+        enable_flash=True, enable_math=False, enable_mem_efficient=False
+    ):
         outputs = generation_model.generate(
             description_prompts,
             max_new_tokens=20,
@@ -107,7 +118,7 @@ def generate_batch(
                 for (j, k) in enumerate(random_ord)
             ]
         )
-        question_prompt += "\nAnswer (A to {chr(ord('A') + n-1)}):"
+        question_prompt += f"\nAnswer (A to {chr(ord('A') + n-1)}):"
         question_prompts.append(question_prompt)
 
     return question_prompts, label_ids, answer_idxs
@@ -148,6 +159,7 @@ def run(
     opt: Optimizer,
     lr_scheduler: LRScheduler,
     accelerator: Accelerator,
+    regression_dset: Dataset,
     tb_logger: TensorBoardLogger,
     csv_logger: CSVLogger,
 ):
@@ -235,6 +247,7 @@ def run(
                         shutil.rmtree(f"{check_dir}/{ckpts[0]}")
 
             if (batch + 1) % task_cfg.eval.freq == 0:
+                # Evaluate the accuracy on a 'validation' task
                 eval_acc = evaluate_accuracy(
                     model,
                     device,
@@ -244,6 +257,21 @@ def run(
                 )
                 logging.info("Step %d: validation accuracy %.4f", batch, eval_acc)
                 tb_logger.log_metrics({"eval_accuracy": eval_acc}, step=batch)
+
+                # Evaluate the perplexity of the model on some 'pretraining'
+                # data
+
+            if (batch + 1) % task_cfg.regression.freq == 0:
+                rloss = 0.0
+                for rb in regression_dset:
+                    rbatch = {k: t.tensor(v).to(device) for k, v in rb.items()}
+                    with t.inference_mode(), t.backends.cuda.sdp_kernel(
+                        enable_flash=True, enable_math=False, enable_mem_efficient=False
+                    ):
+                        rloss += model.model(**rbatch).loss.item()
+                rppl = rloss / len(regression_dset)
+                logging.info("Step %d: regression perplexity %.4f", batch, rppl)
+                tb_logger.log_metrics({"regression_ppl": rppl}, step=batch)
 
 
 @hydra.main(
@@ -280,8 +308,13 @@ def do_mcsb_task(cfg: DictConfig):
 
     model.model, opt, lr_scheduler = accelerator.prepare(model.model, opt, lr_scheduler)
 
+    # Prepare dataset for regression evaluations
+    regress_dset = prepare_wikitext_dset(model.tokenizer, **cfg.regression)
+
+    print(regress_dset)
+
     # Run the training
-    run(cfg, model, opt, lr_scheduler, accelerator, tb_logger, csv_logger)
+    run(cfg, model, opt, lr_scheduler, accelerator, regress_dset, tb_logger, csv_logger)
 
     # Perform any post-processing and save final model
     logging.info("Doing post-processing")

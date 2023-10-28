@@ -13,6 +13,7 @@
 # limitations under the License.
 """Utilities for the MCSB task"""
 
+from datasets import load_dataset, Dataset
 from torchtyping import TensorType as Tensor
 from wonderwords import RandomWord
 from transformers import PreTrainedTokenizer
@@ -54,3 +55,46 @@ def get_new_words(tokenizer: PreTrainedTokenizer, r: RandomWord, n: int) -> list
                 words.append(word)
                 break
     return words
+
+
+def prepare_wikitext_dset(
+    tokenizer: PreTrainedTokenizer,
+    *,
+    block_size: int = 1024,
+    blocks: int = 50,
+    seed: int = 42,
+    num_proc: int = 8,
+    **_kwargs,
+) -> Dataset:
+    """
+    Prepares a validation split of wikitext.
+    """
+    dset = load_dataset("wikitext", "wikitext-2-v1", split="validation")
+
+    def preprocess_function(examples):
+        return tokenizer([" ".join(x) for x in examples["text"]])
+
+    def group(examples):
+        # Concatenate everything
+        concatenated_examples = {k: sum(examples[k], []) for k in examples.keys()}
+        total_length = len(concatenated_examples[list(examples.keys())[0]])
+
+        # Drop the last bit to avoid having to use padding (some efficient
+        # kernels don't support it)
+        if total_length >= block_size:
+            total_length = (total_length // block_size) * block_size
+
+        # Split by chunks of block_size.
+        result = {
+            k: [t[i : i + block_size] for i in range(0, total_length, block_size)]
+            for k, t in concatenated_examples.items()
+        }
+        result["labels"] = result["input_ids"].copy()
+        return result
+
+    tokenized_dset = dset.map(
+        preprocess_function, batched=True, num_proc=num_proc, remove_columns=["text"]
+    )
+    tokenized_dset = tokenized_dset.map(group, batched=True, num_proc=num_proc)
+    tokenized_dset = tokenized_dset.shuffle(seed=seed).select(range(blocks))
+    return tokenized_dset
