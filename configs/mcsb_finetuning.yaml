@@ -35,13 +35,20 @@ eval:
   min_labels: 5
   max_labels: 9
 
+regression:
+  freq: 10
+  block_size: 512
+  blocks: 20
+  seed: 42
+  num_proc: 16
+
 checkpoint:
   freq: 100
   keep: 3
 # to recover from a given checkpoint, paste the directory path here:
-hydra:
-  run:
-    dir: logs/mcsb/2023-10-27_15-49-09
+# hydra:
+#   run:
+#     dir: logs/mcsb/2023-10-28_13-52-30
 
 opt:
   lr: 0.001

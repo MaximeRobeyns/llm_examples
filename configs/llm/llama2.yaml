@@ -1,5 +1,4 @@
 name: Llama2
-
 model_name_or_path: meta-llama/Llama-2-7b-chat-hf
 
 config_kwargs:
@@ -9,5 +8,7 @@ tokenizer_kwargs:
   use_fast: true
 
 defaults:
-  - peft: adalora
-  - quantization: none
+  - base_hf_llm
+  - peft: lora
+  - quantization: 4bit
+  - _self_

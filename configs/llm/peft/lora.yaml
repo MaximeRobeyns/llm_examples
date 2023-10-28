@@ -1,6 +1,6 @@
 _target_: peft.LoraConfig
-r: 24
-lora_alpha: 32
+r: 8
+lora_alpha: 8
 # target_modules: ["c_attn", "c_proj", "c_fc", "c_proj", "lm_head"]
 lora_dropout: 0.05
 bias: "none"
