@@ -1,5 +1,11 @@
-.PHONY: finetune install board lab kernel help
+.PHONY: install board lab kernel help
 
+.PHONY: offline_finetune
+offline_finetune:  ## Example model fine-tuning script on symbol binding task
+	accelerate launch --config_file configs/accelerate/local_with_ds.yaml \
+		llm_examples/mcsb_ft/offline.py # hydra=dev
+
+.PHONY: finetune
 finetune:  ## Example model fine-tuning script on symbol binding task
 	accelerate launch --config_file configs/accelerate/local_with_ds.yaml \
 		llm_examples/mcsb_ft/mcsb.py hydra=dev

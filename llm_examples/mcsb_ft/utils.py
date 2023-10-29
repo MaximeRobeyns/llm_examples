@@ -13,6 +13,8 @@
 # limitations under the License.
 """Utilities for the MCSB task"""
 
+import torch as t
+
 from datasets import load_dataset, Dataset
 from torchtyping import TensorType as Tensor
 from wonderwords import RandomWord
@@ -28,7 +30,7 @@ def get_num_correct(
     answer_logits = logits.gather(1, gather_idxs)
     max_logit = answer_logits.argmax(-1).cpu()
     assert max_logit.shape == answer_idxs.shape
-    return int((max_logit == answer_idxs).sum().item())
+    return int((max_logit == answer_idxs.cpu()).sum().item())
 
 
 def clean(seq: str, sep: str) -> str:
@@ -55,6 +57,14 @@ def get_new_words(tokenizer: PreTrainedTokenizer, r: RandomWord, n: int) -> list
                 words.append(word)
                 break
     return words
+
+
+def get_label_ids(tokenizer: PreTrainedTokenizer, n: int, numerical: bool) -> t.Tensor:
+    """Returns the tokenized labels for a question with n choices"""
+    return tokenizer(
+        [f"{chr(ord('0') + i if numerical else ord('A') + i)}" for i in range(n)],
+        return_tensors="pt",
+    ).input_ids[:, -1:]
 
 
 def prepare_wikitext_dset(

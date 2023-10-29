@@ -1,0 +1,81 @@
+# @package _global_
+
+# 1. Load up the default component configurations
+defaults:
+  - base_config
+  - opt: adamw
+  - llm: gpt2.yaml
+  - override llm/peft: adalora
+  - override llm/quantization: none
+  - _self_
+
+# 2. Task-specific configurations:
+notes: |-
+  Multiple choice symbol binding finetuning using a dataset generated offline.
+
+task_name: mcsb_offline
+
+seed: null
+
+dataset:
+  name: mcsb_offline
+  generate: false # (re)generate the dataset
+  gen_batch_size: 100 # how many samples to generate at once
+
+  num_examples: 100000 # Size of the offline training set
+  num_labels: 5 # The number of multiple-choice options in each question
+  batch_size: 64 # batch size for training split
+
+  validation_examples: 1000 # Size of offline validation set
+  val_num_labels: 8 # Number of labels for validation split
+  val_batch_size: 64 # batch size for validation split
+
+generation_llm:
+  _target_: llm_examples.llm.vllm.VLLM
+  name: Llama_2_vLLM
+  model_name_or_path: meta-llama/Llama-2-7b-chat-hf
+  # dtype: bfloat16
+
+gradient_accumulation_steps: 1 # micro batch size = batch_size / grad acc steps
+
+num_warmup_steps: 20 # learning rate scheduler warmup steps
+
+eval:
+  freq: 10
+  iters: 5
+
+regression:
+  freq: 10
+  block_size: 512
+  blocks: 20
+  seed: 42
+  num_proc: 16
+
+checkpoint:
+  freq: 100
+  keep: 3
+
+# to recover from a given checkpoint, paste the directory path here:
+# hydra:
+#   run:
+#     dir: logs/mcsb/2023-10-28_13-52-30
+
+opt:
+  lr: 0.001
+
+# 3. Overload default component configurations for the task at hand
+llm:
+  use_peft: true
+
+  model_kwargs:
+    low_cpu_mem_usage: true
+    torch_dtype: bfloat16
+
+  tokenizer_kwargs:
+    padding_side: left
+
+  tokenizer_special_tokens:
+    pad_token: tokenizer.bos_token
+
+  global_gen_kwargs:
+    do_sample: True
