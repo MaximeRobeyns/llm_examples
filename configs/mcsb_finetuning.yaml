@@ -25,7 +25,7 @@ training_examples: 100000
 
 # batch size = micro_batch_size * gradient_accumulation_steps
 # note: micro_batch_size must be divisible by number of processes
-micro_batch_size: 20
+micro_batch_size: 40
 gradient_accumulation_steps: 4
 num_warmup_steps: 20
 

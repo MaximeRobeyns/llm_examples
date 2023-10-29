@@ -1,7 +1,8 @@
 <center>
-<h1>Transformer Finetuning Examples</h1>
+<h1>LLM Examples</h1>
 <hr>
 </center>
 
-A repository containing an example project structure for fine-tuning your own
-transformer models.
+A collection of examples relating to training, fine-tuning and running inference with LLMs.
+
+> **Note:** This repository is a work in progress. More examples will be added soon.
