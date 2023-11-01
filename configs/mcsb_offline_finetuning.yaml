@@ -6,7 +6,7 @@ defaults:
   - opt: adamw
   - llm: gpt2.yaml
   - override llm/peft: adalora
-  - override llm/quantization: none
+  - override llm/quantization: null
   - _self_
 
 # 2. Task-specific configurations:
@@ -56,16 +56,16 @@ checkpoint:
   keep: 3
 
 # to recover from a given checkpoint, paste the directory path here:
-hydra:
-  run:
-    dir: logs/mcsb_offline/2023-10-29_18-03-20
+# hydra:
+#   run:
+#     dir: logs/mcsb_offline/2023-10-29_18-03-20
 
 opt:
   lr: 0.001
 
 # 3. Overload default component configurations for the task at hand
 llm:
-  use_peft: true
+  use_peft: false
 
   model_kwargs:
     low_cpu_mem_usage: true

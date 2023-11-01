@@ -39,7 +39,11 @@ from torch.optim.lr_scheduler import LRScheduler
 from lightning.fabric.loggers.csv_logs import CSVLogger
 from lightning.fabric.loggers.tensorboard import TensorBoardLogger
 
-from llm_examples.utils import setup_loggers, setup_accelerator
+from llm_examples.utils import (
+    print_trainable_parameters,
+    setup_loggers,
+    setup_accelerator,
+)
 from llm_examples.llm import HuggingFaceLLM, VLLM
 from llm_examples.mcsb_ft.utils import (
     get_new_words,
@@ -352,6 +356,7 @@ def offline_dataset_mcsb(cfg: DictConfig):
 
     # Set up LLM to train
     model: HuggingFaceLLM = instantiate(cfg.llm)
+    print_trainable_parameters(model.model)
 
     dataset.set_format(type="torch")
     assert cfg.dataset.batch_size % cfg.gradient_accumulation_steps == 0
@@ -414,7 +419,8 @@ def offline_dataset_mcsb(cfg: DictConfig):
     logging.info("Doing post-processing")
 
     unwrapped_model = accelerator.unwrap_model(model.model)
-    unwrapped_model = unwrapped_model.merge_and_unload()
+    if cfg.llm.use_peft:
+        unwrapped_model = unwrapped_model.merge_and_unload()
     unwrapped_model.save_pretrained(f"{cfg.paths.output_dir}/{cfg.task_name}_model")
 
     logging.info("successfully completed.")

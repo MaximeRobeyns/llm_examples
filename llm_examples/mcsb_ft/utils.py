@@ -74,12 +74,13 @@ def prepare_wikitext_dset(
     blocks: int = 50,
     seed: int = 42,
     num_proc: int = 8,
+    split: str = "validation",
     **_kwargs,
 ) -> Dataset:
     """
     Prepares a validation split of wikitext.
     """
-    dset = load_dataset("wikitext", "wikitext-2-v1", split="validation")
+    dset = load_dataset("wikitext", "wikitext-2-v1", split=split)
 
     def preprocess_function(examples):
         return tokenizer([" ".join(x) for x in examples["text"]])
