@@ -95,8 +95,9 @@ class HuggingFaceLLM(LLM):
         )
         tokenizer_special_tokens = {
             k: getattr(self.tokenizer, v.split(".")[-1])
+            if isinstance(v, str) and v.startswith("tokenizer")
+            else v
             for k, v in tokenizer_special_tokens.items()
-            if v.startswith("tokenizer")
         }
         if len(tokenizer_special_tokens) > 0:
             self.tokenizer.add_special_tokens(tokenizer_special_tokens)
